@@ -1,6 +1,6 @@
 {
   "name": "@anishpras/rbac",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "A fast, flexible, and production-ready role-based access control (RBAC) system for JavaScript/TypeScript applications.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
