@@ -22,8 +22,10 @@
     "fix": "biome check --apply-safe ./src",
     "fix:unsafe": "biome check --fix --unsafe",
     "check": "biome check ./src",
-    "prepublishOnly": "npm run lint && npm run test && npm run build:prod",
-    "prepare": "npm run build:prod"
+    "pkg-size": "npm pack --dry-run && tar -tvf anishpras-rbac-*.tgz | sort -k 3 -n",
+    "prepublishOnly": "npm run lint && npm run test && npm run build:release",
+    "build:release": "NODE_ENV=production tsc -p tsconfig.publish.json && npm run minify",
+    "prepare": "npm run build:release"
   },
   "keywords": [
     "rbac",

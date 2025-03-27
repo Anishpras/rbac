@@ -1,3 +1,6 @@
+# Source maps
+*.map
+
 # Source
 src/
 

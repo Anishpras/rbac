@@ -70,13 +70,30 @@ jsFiles.forEach(filePath => {
     const hasSourceMap = fs.existsSync(sourceMapPath);
     
     // Add source map options if available
-    const sourceMapOptions = hasSourceMap ? `--source-map "content='${sourceMapPath}',url='${path.basename(filePath)}.map'"` : '';
-    const minifyCmd = `npx terser "${filePath}" --compress --mangle ${sourceMapOptions} --output "${filePath}"`;
+    const sourceMapOptions = hasSourceMap && process.env.NODE_ENV !== 'production' ? 
+      `--source-map "content='${sourceMapPath}',url='${path.basename(filePath)}.map'"` : '';
+    
+    // More aggressive compression for production
+    const compressionOptions = process.env.NODE_ENV === 'production' ?
+      '--compress passes=3,pure_getters=true,toplevel=true,drop_console=true,ecma=2020 --mangle toplevel=true,reserved=["RBACManager"]' :
+      '--compress --mangle';
+    
+    const minifyCmd = `npx terser "${filePath}" ${compressionOptions} ${sourceMapOptions} --output "${filePath}"`;
     execSync(minifyCmd);
     
     // Add the banner to the minified file
     const minifiedContent = fs.readFileSync(filePath, 'utf8');
     fs.writeFileSync(filePath, `${banner}\n${minifiedContent}`);
+    
+    // Remove source maps after minification if in production mode
+    if (process.env.NODE_ENV === 'production' && hasSourceMap) {
+      fs.unlinkSync(sourceMapPath);
+      
+      // Also remove source map reference in the file
+      let finalContent = fs.readFileSync(filePath, 'utf8');
+      finalContent = finalContent.replace(/\/\/# sourceMappingURL=.*\.map/g, '');
+      fs.writeFileSync(filePath, finalContent);
+    }
     
     const sizeAfter = fs.statSync(filePath).size;
     totalSizeAfter += sizeAfter;
