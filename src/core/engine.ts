@@ -1,15 +1,15 @@
-import { 
-  RBACConfig, 
-  Role, 
-  Resource, 
-  Permission, 
-  Policy, 
+import type {
+  Permission,
+  Policy,
   PolicyResult,
+  RBACConfig,
   RBACOptions,
-  RoleHierarchy
-} from '../types';
-import { PermissionCache } from '../utils/cache';
-import { defaultLogger, silentLogger } from '../utils/logger';
+  Resource,
+  Role,
+  RoleHierarchy,
+} from "../types";
+import { PermissionCache } from "../utils/cache";
+import { defaultLogger, silentLogger } from "../utils/logger";
 
 /**
  * RBAC Engine - Core implementation of the role-based access control system
@@ -18,7 +18,7 @@ export class RBACEngine {
   private config: RBACConfig;
   private cache: PermissionCache | null;
   private strict: boolean;
-  private logger: Required<RBACOptions>['logger'];
+  private logger: Required<RBACOptions>["logger"];
   private roleHierarchy: RoleHierarchy = {};
 
   /**
@@ -28,18 +28,15 @@ export class RBACEngine {
     this.config = config;
     this.strict = options.strict || false;
     this.logger = options.logger || (options.strict ? defaultLogger : silentLogger);
-    
+
     // Initialize cache if enabled
     if (options.cache?.enabled) {
-      this.cache = new PermissionCache(
-        options.cache.maxSize,
-        options.cache.ttl
-      );
-      this.logger.debug('Permission cache initialized');
+      this.cache = new PermissionCache(options.cache.maxSize, options.cache.ttl);
+      this.logger.debug("Permission cache initialized");
     } else {
       this.cache = null;
     }
-    
+
     // Validate the configuration
     this.validateConfig();
   }
@@ -49,14 +46,16 @@ export class RBACEngine {
    */
   private validateConfig(): void {
     if (!this.config.roles || Object.keys(this.config.roles).length === 0) {
-      throw new Error('RBAC configuration must contain at least one role');
+      throw new Error("RBAC configuration must contain at least one role");
     }
 
     if (this.config.defaultRole && !this.config.roles[this.config.defaultRole]) {
-      throw new Error(`Default role "${this.config.defaultRole}" is not defined in the configuration`);
+      throw new Error(
+        `Default role "${this.config.defaultRole}" is not defined in the configuration`,
+      );
     }
 
-    this.logger.debug('RBAC configuration validated successfully');
+    this.logger.debug("RBAC configuration validated successfully");
   }
 
   /**
@@ -64,8 +63,8 @@ export class RBACEngine {
    */
   public setRoleHierarchy(hierarchy: RoleHierarchy): void {
     this.roleHierarchy = hierarchy;
-    this.logger.debug('Role hierarchy configured', hierarchy);
-    
+    this.logger.debug("Role hierarchy configured", hierarchy);
+
     // Clear cache when hierarchy changes
     if (this.cache) {
       this.cache.clear();
@@ -78,8 +77,8 @@ export class RBACEngine {
   public updateConfig(config: RBACConfig): void {
     this.config = config;
     this.validateConfig();
-    this.logger.info('RBAC configuration updated');
-    
+    this.logger.info("RBAC configuration updated");
+
     // Clear cache when configuration changes
     if (this.cache) {
       this.cache.clear();
@@ -101,7 +100,7 @@ export class RBACEngine {
 
     // Direct permission check
     const allowed = this.checkPermission(role, resource, permission);
-    
+
     // Check inherited roles if not allowed directly
     let inheritedAllowed = false;
     if (!allowed && this.roleHierarchy[role]) {
@@ -115,17 +114,22 @@ export class RBACEngine {
     }
 
     const result = allowed || inheritedAllowed;
-    
+
     // Cache the result if caching is enabled
     this.cacheResult(role, resource, permission, result);
-    
+
     return result;
   }
 
   /**
    * Stores a permission check result in the cache
    */
-  private cacheResult(role: Role, resource: Resource, permission: Permission, result: boolean): void {
+  private cacheResult(
+    role: Role,
+    resource: Resource,
+    permission: Permission,
+    result: boolean,
+  ): void {
     if (this.cache) {
       this.cache.set(role, resource, permission, result);
     }
@@ -136,7 +140,7 @@ export class RBACEngine {
    */
   private checkPermission(role: Role, resource: Resource, permission: Permission): boolean {
     const roleDefinition = this.config.roles[role];
-    
+
     // Check if the role exists
     if (!roleDefinition) {
       if (this.strict) {
@@ -145,19 +149,22 @@ export class RBACEngine {
       this.logger.warn(`Unknown role: ${role}`);
       return false;
     }
-    
+
     // Check if the role has permissions for the resource
     const resourcePermissions = roleDefinition.permissions[resource];
     if (!resourcePermissions) {
       this.logger.debug(`Role ${role} has no permissions defined for resource ${resource}`);
       return false;
     }
-    
+
     // Check if the permission is granted
-    const hasPermission = resourcePermissions.includes(permission) || resourcePermissions.includes('*');
-    
-    this.logger.debug(`Direct permission check: ${role} ${hasPermission ? 'has' : 'does not have'} ${permission} permission on ${resource}`);
-    
+    const hasPermission =
+      resourcePermissions.includes(permission) || resourcePermissions.includes("*");
+
+    this.logger.debug(
+      `Direct permission check: ${role} ${hasPermission ? "has" : "does not have"} ${permission} permission on ${resource}`,
+    );
+
     return hasPermission;
   }
 
@@ -178,7 +185,7 @@ export class RBACEngine {
         return true;
       }
     }
-    
+
     return false;
   }
 
@@ -187,27 +194,27 @@ export class RBACEngine {
    */
   public getPermissions(role: Role, resource: Resource): Permission[] {
     const roleDefinition = this.config.roles[role];
-    
+
     if (!roleDefinition) {
       if (this.strict) {
         throw new Error(`Role "${role}" does not exist`);
       }
       return [];
     }
-    
+
     const directPermissions = roleDefinition.permissions[resource] || [];
-    
+
     // Get inherited permissions if applicable
     let inheritedPermissions: Permission[] = [];
     if (this.roleHierarchy[role]) {
       for (const parentRole of this.roleHierarchy[role]) {
         inheritedPermissions = [
           ...inheritedPermissions,
-          ...this.getPermissions(parentRole, resource)
+          ...this.getPermissions(parentRole, resource),
         ];
       }
     }
-    
+
     // Combine and deduplicate permissions
     return [...new Set([...directPermissions, ...inheritedPermissions])];
   }
@@ -217,31 +224,28 @@ export class RBACEngine {
    */
   public getResources(role: Role): Resource[] {
     const roleDefinition = this.config.roles[role];
-    
+
     if (!roleDefinition) {
       if (this.strict) {
         throw new Error(`Role "${role}" does not exist`);
       }
       return [];
     }
-    
+
     const directResources = Object.keys(roleDefinition.permissions);
-    
+
     // Get inherited resources if applicable
     let inheritedResources: Resource[] = [];
     if (this.roleHierarchy[role]) {
       for (const parentRole of this.roleHierarchy[role]) {
-        inheritedResources = [
-          ...inheritedResources,
-          ...this.getResources(parentRole)
-        ];
+        inheritedResources = [...inheritedResources, ...this.getResources(parentRole)];
       }
     }
-    
+
     // Combine and deduplicate resources
     const allResources = [...new Set([...directResources, ...inheritedResources])];
-    this.logger.debug(`Resources for role ${role}: ${allResources.join(', ')}`);
-    
+    this.logger.debug(`Resources for role ${role}: ${allResources.join(", ")}`);
+
     return allResources;
   }
 
@@ -250,19 +254,19 @@ export class RBACEngine {
    */
   public evaluatePolicy(policy: Policy): PolicyResult {
     const { role, resource, permission } = policy;
-    
+
     try {
       const allowed = this.can(role, resource, permission);
       return {
         allowed,
         reason: allowed
           ? `Role "${role}" has "${permission}" permission on resource "${resource}"`
-          : `Role "${role}" does not have "${permission}" permission on resource "${resource}"`
+          : `Role "${role}" does not have "${permission}" permission on resource "${resource}"`,
       };
     } catch (error) {
       return {
         allowed: false,
-        reason: error instanceof Error ? error.message : String(error)
+        reason: error instanceof Error ? error.message : String(error),
       };
     }
   }
@@ -288,10 +292,10 @@ export class RBACEngine {
     if (!this.cache) {
       return { enabled: false };
     }
-    
+
     return {
       enabled: true,
-      size: this.cache.size()
+      size: this.cache.size(),
     };
   }
 
@@ -301,7 +305,7 @@ export class RBACEngine {
   public clearCache(): void {
     if (this.cache) {
       this.cache.clear();
-      this.logger.debug('Permission cache cleared');
+      this.logger.debug("Permission cache cleared");
     }
   }
 }

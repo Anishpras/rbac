@@ -6,7 +6,8 @@ export class PermissionCache {
   private readonly maxSize: number;
   private readonly ttl: number; // Time-to-live in milliseconds
 
-  constructor(maxSize = 1000, ttl = 5 * 60 * 1000) { // Default 5-minute TTL
+  constructor(maxSize = 1000, ttl = 5 * 60 * 1000) {
+    // Default 5-minute TTL
     this.cache = new Map();
     this.maxSize = maxSize;
     this.ttl = ttl;
@@ -26,21 +27,21 @@ export class PermissionCache {
   get(role: string, resource: string, permission: string): boolean | undefined {
     const key = this.createKey(role, resource, permission);
     const entry = this.cache.get(key);
-    
+
     if (!entry) {
       return undefined;
     }
-    
+
     // Check if entry has expired
     if (entry.expiresAt < Date.now()) {
       this.cache.delete(key);
       return undefined;
     }
-    
+
     // Move the entry to the end of the map to maintain LRU order
     this.cache.delete(key);
     this.cache.set(key, entry);
-    
+
     return entry.value;
   }
 
@@ -49,7 +50,7 @@ export class PermissionCache {
    */
   set(role: string, resource: string, permission: string, value: boolean): void {
     const key = this.createKey(role, resource, permission);
-    
+
     // If cache is at capacity, remove the least recently used item (first item in the map)
     if (this.cache.size >= this.maxSize) {
       const firstKey = this.cache.keys().next().value;
@@ -57,10 +58,10 @@ export class PermissionCache {
         this.cache.delete(firstKey);
       }
     }
-    
+
     this.cache.set(key, {
       value,
-      expiresAt: Date.now() + this.ttl
+      expiresAt: Date.now() + this.ttl,
     });
   }
 
@@ -87,7 +88,7 @@ export class PermissionCache {
    */
   invalidateResource(resource: string): void {
     for (const key of this.cache.keys()) {
-      const parts = key.split(':');
+      const parts = key.split(":");
       if (parts[1] === resource) {
         this.cache.delete(key);
       }

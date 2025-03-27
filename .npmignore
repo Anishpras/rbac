@@ -11,7 +11,8 @@ coverage/
 # Configuration files
 tsconfig.json
 jest.config.js
-.eslintrc
+biome.json
+.eslintrc*
 .eslintignore
 .prettier*
 

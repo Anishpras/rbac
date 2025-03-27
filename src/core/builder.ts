@@ -1,16 +1,11 @@
-import { 
-  RBACConfig, 
-  Role, 
-  Resource, 
-  Permission
-} from '../types';
+import type { Permission, RBACConfig, Resource, Role } from "../types";
 
 /**
  * RBAC Configuration Builder - Fluent API for building RBAC configurations
  */
 export class RBACBuilder {
   private config: RBACConfig = {
-    roles: {}
+    roles: {},
   };
 
   /**
@@ -26,12 +21,12 @@ export class RBACBuilder {
    */
   public role(name: Role, description?: string): RoleBuilder {
     const roleBuilder = new RoleBuilder(this, name, description);
-    
+
     this.config.roles[name] = {
       description,
-      permissions: {}
+      permissions: {},
     };
-    
+
     return roleBuilder;
   }
 
@@ -42,7 +37,7 @@ export class RBACBuilder {
     if (!this.config.roles[role]) {
       throw new Error(`Cannot set default role: Role "${role}" does not exist`);
     }
-    
+
     this.config.defaultRole = role;
     return this;
   }
@@ -54,14 +49,14 @@ export class RBACBuilder {
     if (!this.config.roles[role]) {
       throw new Error(`Cannot extend role: Role "${role}" does not exist`);
     }
-    
+
     if (!this.config.roles[baseRole]) {
       throw new Error(`Cannot extend role: Base role "${baseRole}" does not exist`);
     }
-    
+
     // Copy permissions from base role
     const basePermissions = this.config.roles[baseRole].permissions;
-    
+
     for (const resource in basePermissions) {
       if (!this.config.roles[role].permissions[resource]) {
         this.config.roles[role].permissions[resource] = [...basePermissions[resource]];
@@ -69,12 +64,12 @@ export class RBACBuilder {
         this.config.roles[role].permissions[resource] = [
           ...new Set([
             ...this.config.roles[role].permissions[resource],
-            ...basePermissions[resource]
-          ])
+            ...basePermissions[resource],
+          ]),
         ];
       }
     }
-    
+
     return this;
   }
 
@@ -112,13 +107,13 @@ export class RoleBuilder {
    * Grants full access (all permissions) to a resource
    */
   public grantFullAccess(resource: Resource): RoleBuilder {
-    const permissions: Permission[] = ['CREATE', 'READ', 'UPDATE', 'DELETE', 'VIEW', '*'];
+    const permissions: Permission[] = ["CREATE", "READ", "UPDATE", "DELETE", "VIEW", "*"];
     const config = this.builder.getConfigRef();
-    
+
     if (!config.roles[this.role].permissions[resource]) {
       config.roles[this.role].permissions[resource] = [];
     }
-    
+
     config.roles[this.role].permissions[resource] = permissions;
     return this;
   }
@@ -127,13 +122,13 @@ export class RoleBuilder {
    * Grants read-only access to a resource
    */
   public grantReadOnly(resource: Resource): RoleBuilder {
-    const permissions: Permission[] = ['READ', 'VIEW'];
+    const permissions: Permission[] = ["READ", "VIEW"];
     const config = this.builder.getConfigRef();
-    
+
     if (!config.roles[this.role].permissions[resource]) {
       config.roles[this.role].permissions[resource] = [];
     }
-    
+
     config.roles[this.role].permissions[resource] = permissions;
     return this;
   }
@@ -165,15 +160,15 @@ export class ResourceBuilder {
    */
   public grant(...permissions: Permission[]): ResourceBuilder {
     const config = this.builder.getConfigRef();
-    
+
     if (!config.roles[this.role].permissions[this.resource]) {
       config.roles[this.role].permissions[this.resource] = [];
     }
-    
+
     config.roles[this.role].permissions[this.resource] = [
-      ...new Set([...config.roles[this.role].permissions[this.resource], ...permissions])
+      ...new Set([...config.roles[this.role].permissions[this.resource], ...permissions]),
     ];
-    
+
     return this;
   }
 
@@ -182,12 +177,19 @@ export class ResourceBuilder {
    */
   public grantAll(): ResourceBuilder {
     const config = this.builder.getConfigRef();
-    
+
     if (!config.roles[this.role].permissions[this.resource]) {
       config.roles[this.role].permissions[this.resource] = [];
     }
-    
-    config.roles[this.role].permissions[this.resource] = ['CREATE', 'READ', 'UPDATE', 'DELETE', 'VIEW', '*'];
+
+    config.roles[this.role].permissions[this.resource] = [
+      "CREATE",
+      "READ",
+      "UPDATE",
+      "DELETE",
+      "VIEW",
+      "*",
+    ];
     return this;
   }
 
@@ -196,12 +198,12 @@ export class ResourceBuilder {
    */
   public grantReadOnly(): ResourceBuilder {
     const config = this.builder.getConfigRef();
-    
+
     if (!config.roles[this.role].permissions[this.resource]) {
       config.roles[this.role].permissions[this.resource] = [];
     }
-    
-    config.roles[this.role].permissions[this.resource] = ['READ', 'VIEW'];
+
+    config.roles[this.role].permissions[this.resource] = ["READ", "VIEW"];
     return this;
   }
 

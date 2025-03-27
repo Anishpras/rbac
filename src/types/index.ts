@@ -1,7 +1,7 @@
 /**
  * Permission represents a single action that can be performed on a resource
  */
-export type Permission = 'CREATE' | 'READ' | 'UPDATE' | 'DELETE' | 'VIEW' | string;
+export type Permission = "CREATE" | "READ" | "UPDATE" | "DELETE" | "VIEW" | string;
 
 /**
  * Resource represents a module or entity in the system
@@ -71,10 +71,10 @@ export interface RBACOptions {
   cache?: CacheOptions;
   strict?: boolean; // If true, throws errors on undefined roles/resources/permissions
   logger?: {
-    debug: (message: string, ...args: any[]) => void;
-    info: (message: string, ...args: any[]) => void;
-    warn: (message: string, ...args: any[]) => void;
-    error: (message: string, ...args: any[]) => void;
+    debug: (message: string, ...args: unknown[]) => void;
+    info: (message: string, ...args: unknown[]) => void;
+    warn: (message: string, ...args: unknown[]) => void;
+    error: (message: string, ...args: unknown[]) => void;
   };
 }
 
@@ -84,7 +84,7 @@ export interface RBACOptions {
 export type PermissionCheck = (
   role: Role,
   resource: Resource,
-  permission: Permission
+  permission: Permission,
 ) => boolean | Promise<boolean>;
 
 /**
@@ -100,5 +100,5 @@ export interface RoleHierarchy {
 export interface User {
   id: string | number;
   roles: Role[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
