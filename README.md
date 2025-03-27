@@ -32,14 +32,14 @@ import { RBACManager, RBACBuilder } from '@anishpras/rbac';
 // Create a configuration using the builder
 const config = new RBACBuilder()
   .role('ADMIN', 'Administrator with full access')
-    .grantFullAccess('Yachts')
+    .grantFullAccess('Products')
     .grantFullAccess('News')
     .grantFullAccess('Bookings')
     .grantFullAccess('AdditionalServices')
     .grantFullAccess('Locations')
     .done()
   .role('EDITOR', 'Editor with limited access')
-    .forResource('Yachts').grantAll().and()
+    .forResource('Products').grantAll().and()
     .forResource('News').grantAll().and()
     .forResource('Bookings').grantReadOnly().and()
     .forResource('AdditionalServices').grantAll().and()
@@ -69,9 +69,9 @@ const user = {
   roles: ['EDITOR']
 };
 
-// Check if a user can create a yacht
-if (rbac.userCan(user, 'Yachts', 'CREATE')) {
-  // User can create yachts
+// Check if a user can create a product
+if (rbac.userCan(user, 'Products', 'CREATE')) {
+  // User can create products
 }
 
 // Check if a user can update a booking
@@ -91,10 +91,10 @@ const rbac = new RBACManager(config);
 
 // Middleware to protect routes
 app.get(
-  '/api/yachts',
+  '/api/products',
   rbac.middleware({
     getUserRoles: (req) => req.user.roles,
-    resource: 'Yachts',
+    resource: 'Products',
     permission: 'READ',
     onDenied: (req, res) => {
       res.status(403).json({ error: 'Access denied' });
@@ -128,7 +128,7 @@ rbac.setRoleHierarchy({
 rbac.addRole('MANAGER', {
   description: 'Manager role',
   permissions: {
-    'Yachts': ['READ', 'UPDATE'],
+    'Products': ['READ', 'UPDATE'],
     'Bookings': ['READ', 'UPDATE', 'CREATE']
   }
 });
@@ -229,10 +229,10 @@ const builder = new RBACBuilder();
 // Define roles and permissions
 builder
   .role('ADMIN')
-    .grantFullAccess('Yachts')
+    .grantFullAccess('Products')
     .done()
   .role('EDITOR')
-    .forResource('Yachts').grant('READ', 'UPDATE').and()
+    .forResource('Products').grant('READ', 'UPDATE').and()
     .forResource('News').grantAll().done()
   .setDefaultRole('EDITOR');
 
