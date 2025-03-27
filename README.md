@@ -1,4 +1,4 @@
-# RABAC: Role and Attribute Based Access Control
+# @anishpras/rbac: Role and Attribute Based Access Control
 
 A fast, flexible, and production-ready role-based access control (RBAC) system for JavaScript/TypeScript applications.
 
@@ -17,15 +17,17 @@ A fast, flexible, and production-ready role-based access control (RBAC) system f
 ## Installation
 
 ```bash
-npm install rbac
+npm install @anishpras/rbac
 # or
-yarn add rbac
+yarn add @anishpras/rbac
+# or
+pnpm add @anishpras/rbac
 ```
 
 ## Quick Start
 
 ```typescript
-import { RBACManager, RBACBuilder } from 'rabac';
+import { RBACManager, RBACBuilder } from '@anishpras/rbac';
 
 // Create a configuration using the builder
 const config = new RBACBuilder()
@@ -82,7 +84,7 @@ if (rbac.userCan(user, 'Bookings', 'UPDATE')) {
 
 ```typescript
 import express from 'express';
-import { RBACManager } from 'rabac';
+import { RBACManager } from '@anishpras/rbac';
 
 const app = express();
 const rbac = new RBACManager(config);

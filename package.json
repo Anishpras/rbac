@@ -1,7 +1,7 @@
 {
-  "name": "rbac",
+  "name": "@anishpras/rbac",
   "version": "1.0.0",
-  "description": "A fast and flexible role-based access control system",
+  "description": "A fast, flexible, and production-ready role-based access control (RBAC) system for JavaScript/TypeScript applications.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -9,11 +9,38 @@
     "test": "jest",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.ts\"",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "npm run lint && npm run test && npm run build",
+    "prepare": "npm run build"
   },
-  "keywords": ["rbac", "authorization", "permissions", "access-control", "security"],
-  "author": "",
+  "keywords": [
+    "rbac",
+    "authorization",
+    "permissions",
+    "access-control",
+    "security"
+  ],
+  "author": "Anish Prashun <anishprashun118@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anishpras/rbac.git"
+  },
+  "homepage": "https://github.com/anishpras/rbac#readme",
+  "bugs": {
+    "url": "https://github.com/anishpras/rbac/issues"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
   "devDependencies": {
     "@types/jest": "^29.5.5",
     "@types/node": "^20.6.3",
