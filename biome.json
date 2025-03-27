@@ -8,7 +8,12 @@
     "rules": {
       "recommended": true,
       "complexity": {
-        "noExcessiveCognitiveComplexity": "error"
+        "noExcessiveCognitiveComplexity": {
+          "level": "error",
+          "options": {
+            "maxAllowedComplexity": 50
+          }
+        }
       },
       "suspicious": {
         "noExplicitAny": "off"

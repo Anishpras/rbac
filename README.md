@@ -158,6 +158,108 @@ rbac.revoke('EDITOR', 'Bookings', ['DELETE']);
 
 8. **Implement Resource Ownership**: For multi-tenant systems, combine RBAC with resource ownership checks for additional security.
 
+## Security Features
+
+This package includes security-focused features to protect your application's permission system:
+
+1. **Input Validation**: All role, resource, and permission inputs are validated to prevent injection attacks and manipulation.
+
+2. **Circular Reference Detection**: Automatic detection and prevention of circular references in role hierarchies.
+
+3. **Default Deny**: The system always defaults to denying access when errors occur or when roles/permissions are undefined.
+
+4. **Deep Cloning**: All configuration objects are deep-cloned to prevent external mutation attacks.
+
+5. **Protected Cache Keys**: The caching system uses sanitized keys and secret salts to prevent cache poisoning.
+
+6. **Secure Middleware**: The Express middleware is designed to securely handle errors and always default to access denial.
+
+7. **Audit Logging**: Built-in audit logging for critical permission changes and access attempts.
+
+8. **Type Safety**: TypeScript types enforce proper structure and prevent common mistakes.
+
+9. **Race Condition Protection**: Special handling to prevent race conditions during permission updates.
+
+10. **Secure Error Handling**: Error messages are designed to avoid leaking sensitive information.
+
+### Recommended Security Configuration
+
+```typescript
+// Create a secure RBAC manager
+const rbac = new RBACManager(config, {
+  cache: {
+    enabled: true,
+    maxSize: 1000,
+    ttl: 30 * 60 * 1000  // 30 minute TTL
+  },
+  strict: true,  // In development: fails fast on errors
+  logger: {
+    debug: (msg, ...args) => console.debug(`[RBAC] ${msg}`, ...args),
+    info: (msg, ...args) => console.info(`[RBAC] ${msg}`, ...args),
+    warn: (msg, ...args) => console.warn(`[RBAC] ${msg}`, ...args),
+    error: (msg, ...args) => console.error(`[RBAC] ${msg}`, ...args)
+  }
+});
+
+// Use secure middleware with audit logging
+app.get(
+  '/api/sensitive-data',
+  rbac.middleware({
+    getUserRoles: (req) => req.user.roles,
+    resource: 'SensitiveData',
+    permission: 'READ',
+    auditLog: true,  // Enable audit logging for sensitive operations
+    onDenied: (req, res) => {
+      // Log the denial but don't expose details
+      console.warn(`Access denied for user ${req.user.id}`);
+      res.status(403).json({ error: 'Access denied' });
+    }
+  }),
+  (req, res) => {
+    // Handle the request
+  }
+);
+```
+
+### Security Hardening Recommendations
+
+1. **Use Predefined Constants**: Instead of using arbitrary strings for roles, resources, and permissions, define constants:
+
+```typescript
+// Define constants for roles, resources, and permissions
+const ROLES = {
+  ADMIN: 'ADMIN',
+  EDITOR: 'EDITOR',
+  VIEWER: 'VIEWER'
+} as const;
+
+const RESOURCES = {
+  PRODUCTS: 'Products',
+  USERS: 'Users',
+  ORDERS: 'Orders'
+} as const;
+
+const PERMISSIONS = {
+  CREATE: 'CREATE',
+  READ: 'READ',
+  UPDATE: 'UPDATE',
+  DELETE: 'DELETE'
+} as const;
+
+// Use constants in your code
+rbac.grant(ROLES.EDITOR, RESOURCES.PRODUCTS, [PERMISSIONS.READ, PERMISSIONS.UPDATE]);
+```
+
+2. **Regular Security Audits**: Implement periodic reviews of your role hierarchies and permission assignments.
+
+3. **Principle of Least Privilege**: Assign the minimum permissions necessary for each role.
+
+4. **Permission Approval Workflow**: For sensitive permissions, implement a multi-step approval process.
+
+5. **Limit Admin Roles**: Restrict the number of users with administrative privileges.
+
+6. **Protect Against Privilege Escalation**: Be careful with dynamic role assignment to prevent unauthorized elevation of privileges.
+
 
 ## API Reference
 

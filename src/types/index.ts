@@ -1,15 +1,18 @@
 /**
  * Permission represents a single action that can be performed on a resource
+ * String literals like 'CREATE', 'READ', etc. are preferred over arbitrary strings for type safety
  */
 export type Permission = "CREATE" | "READ" | "UPDATE" | "DELETE" | "VIEW" | string;
 
 /**
  * Resource represents a module or entity in the system
+ * Prefer using predefined constants for resources rather than arbitrary strings for consistency
  */
 export type Resource = string;
 
 /**
  * Role represents a role in the system (e.g., "ADMIN", "CLIENT")
+ * Prefer using predefined constants for roles rather than arbitrary strings for security
  */
 export type Role = string;
 
@@ -96,9 +99,10 @@ export interface RoleHierarchy {
 
 /**
  * User represents a user in the system
+ * Must have an id and an array of roles
  */
 export interface User {
   id: string | number;
-  roles: Role[];
-  [key: string]: unknown;
+  roles: Role[];  // Array of role identifiers
+  [key: string]: unknown;  // Additional user properties
 }

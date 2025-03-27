@@ -62,6 +62,9 @@ export class RBACEngine {
    * Sets up role hierarchy relationships
    */
   public setRoleHierarchy(hierarchy: RoleHierarchy): void {
+    // Validate hierarchy for circular references
+    this.validateHierarchy(hierarchy);
+    
     this.roleHierarchy = hierarchy;
     this.logger.debug("Role hierarchy configured", hierarchy);
 
@@ -72,10 +75,66 @@ export class RBACEngine {
   }
 
   /**
+   * Validates the role hierarchy to prevent circular references
+   * @private
+   */
+  private validateHierarchy(hierarchy: RoleHierarchy): void {
+    // For each role, check if there's a path back to itself
+    for (const role in hierarchy) {
+      const visited = new Set<Role>();
+      const stack = new Set<Role>();
+      
+      if (this.detectCycle(role, hierarchy, visited, stack)) {
+        throw new Error(`Circular reference detected in role hierarchy involving role "${role}"`); 
+      }
+    }
+  }
+
+  /**
+   * Detects cycles in the role hierarchy using depth-first search
+   * @private
+   */
+  private detectCycle(
+    role: Role,
+    hierarchy: RoleHierarchy,
+    visited: Set<Role>,
+    stack: Set<Role>
+  ): boolean {
+    // If role is already in the stack, we found a cycle
+    if (stack.has(role)) {
+      return true;
+    }
+    
+    // If we've already checked this role and found no cycles, skip it
+    if (visited.has(role)) {
+      return false;
+    }
+    
+    // Add role to both visited and the current traversal stack
+    visited.add(role);
+    stack.add(role);
+    
+    // Check all parent roles that this role inherits from
+    const parentRoles = hierarchy[role] || [];
+    for (const parentRole of parentRoles) {
+      if (this.detectCycle(parentRole, hierarchy, visited, stack)) {
+        return true;
+      }
+    }
+    
+    // Remove role from current traversal stack as we backtrack
+    stack.delete(role);
+    return false;
+  }
+
+  /**
    * Updates the RBAC configuration
    */
   public updateConfig(config: RBACConfig): void {
-    this.config = config;
+    // Create a deep copy of the config to prevent external modifications
+    this.config = this.deepCloneConfig(config);
+    
+    // Validate the configuration
     this.validateConfig();
     this.logger.info("RBAC configuration updated");
 
@@ -83,6 +142,54 @@ export class RBACEngine {
     if (this.cache) {
       this.cache.clear();
     }
+  }
+  
+  /**
+   * Creates a deep clone of the configuration to prevent external references and mutations
+   * @private
+   */
+  private deepCloneConfig(config: RBACConfig): RBACConfig {
+    if (!config || typeof config !== 'object') {
+      throw new Error('Invalid RBAC configuration');
+    }
+    
+    // Start with a fresh object
+    const clonedConfig: RBACConfig = {
+      roles: {}
+    };
+    
+    // Clone default role if present
+    if (config.defaultRole) {
+      clonedConfig.defaultRole = String(config.defaultRole);
+    }
+    
+    // Deep clone each role and its permissions
+    if (config.roles) {
+      for (const role in config.roles) {
+        if (Object.prototype.hasOwnProperty.call(config.roles, role)) {
+          const roleDefinition = config.roles[role];
+          
+          // Create new role definition
+          clonedConfig.roles[role] = {
+            description: roleDefinition.description ? String(roleDefinition.description) : undefined,
+            permissions: {}
+          };
+          
+          // Clone all permissions for each resource
+          for (const resource in roleDefinition.permissions) {
+            if (Object.prototype.hasOwnProperty.call(roleDefinition.permissions, resource)) {
+              const permissions = roleDefinition.permissions[resource];
+              if (Array.isArray(permissions)) {
+                // Create a new array for permissions
+                clonedConfig.roles[role].permissions[resource] = [...permissions];
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return clonedConfig;
   }
 
   /**
@@ -139,6 +246,11 @@ export class RBACEngine {
    * Internal method to check if a role has a permission on a resource
    */
   private checkPermission(role: Role, resource: Resource, permission: Permission): boolean {
+    // Validate inputs to prevent injection or manipulation
+    this.validateInput(role, 'role');
+    this.validateInput(resource, 'resource');
+    this.validateInput(permission, 'permission');
+    
     const roleDefinition = this.config.roles[role];
 
     // Check if the role exists
@@ -158,8 +270,12 @@ export class RBACEngine {
     }
 
     // Check if the permission is granted
-    const hasPermission =
-      resourcePermissions.includes(permission) || resourcePermissions.includes("*");
+    // Only allow if the permission is explicitly in the list or wildcard (*) is included
+    const hasPermission = resourcePermissions.includes(permission) || resourcePermissions.includes("*");
+
+    if (!hasPermission) {
+      this.logger.debug(`Permission "${permission}" not granted for role ${role} on resource ${resource}`);
+    }
 
     this.logger.debug(
       `Direct permission check: ${role} ${hasPermission ? "has" : "does not have"} ${permission} permission on ${resource}`,
@@ -167,26 +283,65 @@ export class RBACEngine {
 
     return hasPermission;
   }
+  
+  /**
+   * Validates a string input to prevent security issues
+   * @private
+   */
+  private validateInput(input: string, field: string): void {
+    if (typeof input !== 'string') {
+      throw new Error(`${field} must be a string`);
+    }
+    
+    if (input.trim() === '') {
+      throw new Error(`${field} cannot be empty`);
+    }
+    
+    // Check for potentially dangerous input patterns or SQL/NoSQL injection attempts
+    const dangerousPatterns = /[\x00-\x1F\x7F]|\$\{|\$\(|\{\{|\}\}|--|;\'|\";|<script>|<\/script>/i;
+    if (dangerousPatterns.test(input)) {
+      this.logger.error(`Potentially malicious ${field} value detected: ${input}`);
+      throw new Error(`Invalid ${field} format`);
+    }
+  }
 
   /**
    * Checks if a user has permission on a resource based on their roles
    */
   public userCan(userRoles: Role[], resource: Resource, permission: Permission): boolean {
-    if (!userRoles || userRoles.length === 0) {
-      if (this.config.defaultRole) {
-        return this.can(this.config.defaultRole, resource, permission);
+    try {
+      // Validate inputs
+      this.validateInput(resource, 'resource');
+      this.validateInput(permission, 'permission');
+
+      // Default deny for empty roles
+      if (!userRoles || userRoles.length === 0) {
+        this.logger.warn('Access check attempted with empty roles array');
+        if (this.config.defaultRole) {
+          this.logger.debug(`Falling back to default role: ${this.config.defaultRole}`);
+          return this.can(this.config.defaultRole, resource, permission);
+        }
+        return false;
       }
+
+      // Validate each role
+      for (const role of userRoles) {
+        this.validateInput(role, 'role');
+      }
+
+      // Check each role for permission
+      for (let i = 0; i < userRoles.length; i++) {
+        if (this.can(userRoles[i], resource, permission)) {
+          return true;
+        }
+      }
+
+      return false;
+    } catch (error) {
+      // Log the error but default to deny on any exception
+      this.logger.error('Error in userCan check', error);
       return false;
     }
-
-    // Use a fast loop rather than Array.some() for better performance
-    for (let i = 0; i < userRoles.length; i++) {
-      if (this.can(userRoles[i], resource, permission)) {
-        return true;
-      }
-    }
-
-    return false;
   }
 
   /**
@@ -253,10 +408,42 @@ export class RBACEngine {
    * Evaluates a policy against the RBAC configuration
    */
   public evaluatePolicy(policy: Policy): PolicyResult {
-    const { role, resource, permission } = policy;
-
     try {
+      // Validate the policy object
+      if (!policy || typeof policy !== 'object') {
+        return {
+          allowed: false,
+          reason: 'Invalid policy object',
+        };
+      }
+      
+      const { role, resource, permission } = policy;
+      
+      // Validate each field exists and is a string
+      if (!role || !resource || !permission) {
+        return {
+          allowed: false,
+          reason: 'Policy must include role, resource, and permission',
+        };
+      }
+      
+      // Validate inputs to prevent injection
+      try {
+        this.validateInput(role, 'role');
+        this.validateInput(resource, 'resource');
+        this.validateInput(permission, 'permission');
+      } catch (validationError) {
+        return {
+          allowed: false,
+          reason: validationError instanceof Error 
+            ? validationError.message 
+            : 'Invalid policy input',
+        };
+      }
+
+      // Check if the role is allowed
       const allowed = this.can(role, resource, permission);
+      
       return {
         allowed,
         reason: allowed
@@ -264,9 +451,11 @@ export class RBACEngine {
           : `Role "${role}" does not have "${permission}" permission on resource "${resource}"`,
       };
     } catch (error) {
+      // Default to deny on any errors
+      this.logger.error('Error in policy evaluation', error);
       return {
         allowed: false,
-        reason: error instanceof Error ? error.message : String(error),
+        reason: 'Policy evaluation error',
       };
     }
   }
@@ -283,6 +472,13 @@ export class RBACEngine {
    */
   public getConfig(): RBACConfig {
     return { ...this.config };
+  }
+
+  /**
+   * Gets the current role hierarchy
+   */
+  public getRoleHierarchy(): RoleHierarchy | undefined {
+    return this.roleHierarchy;
   }
 
   /**

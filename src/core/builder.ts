@@ -107,7 +107,8 @@ export class RoleBuilder {
    * Grants full access (all permissions) to a resource
    */
   public grantFullAccess(resource: Resource): RoleBuilder {
-    const permissions: Permission[] = ["CREATE", "READ", "UPDATE", "DELETE", "VIEW", "*"];
+    // Removed wildcard (*) permission for better security
+    const permissions: Permission[] = ["CREATE", "READ", "UPDATE", "DELETE", "VIEW"];
     const config = this.builder.getConfigRef();
 
     if (!config.roles[this.role].permissions[resource]) {
@@ -182,13 +183,13 @@ export class ResourceBuilder {
       config.roles[this.role].permissions[this.resource] = [];
     }
 
+    // Removed wildcard (*) permission for better security
     config.roles[this.role].permissions[this.resource] = [
       "CREATE",
       "READ",
       "UPDATE",
       "DELETE",
-      "VIEW",
-      "*",
+      "VIEW"
     ];
     return this;
   }
