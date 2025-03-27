@@ -480,6 +480,32 @@ builder
 const config = builder.build();
 ```
 
+## Build and Development
+
+### Building the Project
+
+This project provides both development and production build options:
+
+```bash
+# Development build (with source maps and comments)
+npm run build
+
+# Production build (minified with source maps)
+npm run build:prod
+```
+
+### Minification
+
+The production build automatically minifies the JavaScript output using Terser with the following optimizations:
+
+- Code compression (removing whitespace, shortening variable names)
+- Dead code elimination
+- Mangling of variable names for smaller file size
+- Preservation of license/copyright comments
+- Sourcemap generation for debugging
+
+This results in significantly smaller file sizes while maintaining full functionality.
+
 ## License
 
 MIT

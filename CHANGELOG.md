@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-03-28
+
+### Added
+- Production build process with code minification using Terser
+- Custom minification script with size optimization reporting
+- Source maps generation for debugging minified code
+- License/copyright preservation in minified files
+- Separate development and production build configurations
+- New build scripts: `build:prod` and `build:all`
+- Documentation for build and minification process
+
+### Changed
+- Updated TypeScript configuration for optimal production builds
+- Improved package exports configuration
+- Enhanced build pipeline with better error handling
+
+## [2.0.1] - 2025-03-15
+
+### Fixed
+- Performance improvements for large role hierarchies
+- Fixed edge case in permission caching
+
+## [2.0.0] - 2025-02-28
+
+### Added
+- Complete rewrite with improved performance
+- Advanced caching mechanisms
+- Better TypeScript integration
+
 ## [1.2.0] - 2024-03-28
 
 ### Security
