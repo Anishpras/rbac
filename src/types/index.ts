@@ -103,6 +103,6 @@ export interface RoleHierarchy {
  */
 export interface User {
   id: string | number;
-  roles: Role[];  // Array of role identifiers
-  [key: string]: unknown;  // Additional user properties
+  roles: Role[]; // Array of role identifiers
+  [key: string]: unknown; // Additional user properties
 }

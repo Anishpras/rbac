@@ -189,7 +189,7 @@ export class ResourceBuilder {
       "READ",
       "UPDATE",
       "DELETE",
-      "VIEW"
+      "VIEW",
     ];
     return this;
   }

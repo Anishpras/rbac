@@ -7,7 +7,7 @@ A fast, flexible, and production-ready role-based access control (RBAC) system f
 - 🚀 **Fast and efficient**: Optimized for speed with LRU caching
 - 🔒 **Type-safe**: Full TypeScript support
 - 🧩 **Flexible**: Define custom roles, resources, and permissions
-- 🔄 **Role hierarchy**: Support for role inheritance
+- 🔄 **Role hierarchy**: Support for role inheritance with robust cycle detection
 - 🛠️ **Middleware support**: Ready for Express.js and other frameworks
 - 📝 **Fluent API**: Intuitive builder pattern for configuration
 - 📊 **Runtime updates**: Modify permissions without restarting
@@ -35,15 +35,11 @@ const config = new RBACBuilder()
     .grantFullAccess('Products')
     .grantFullAccess('News')
     .grantFullAccess('Bookings')
-    .grantFullAccess('AdditionalServices')
-    .grantFullAccess('Locations')
     .done()
   .role('EDITOR', 'Editor with limited access')
     .forResource('Products').grantAll().and()
     .forResource('News').grantAll().and()
-    .forResource('Bookings').grantReadOnly().and()
-    .forResource('AdditionalServices').grantAll().and()
-    .forResource('Locations').grantReadOnly().done()
+    .forResource('Bookings').grantReadOnly().done()
   .setDefaultRole('EDITOR')
   .build();
 
@@ -104,9 +100,39 @@ app.get(
     // Handle the request
   }
 );
+
+// Dynamic permission based on HTTP method
+app.all(
+  '/api/bookings/:id',
+  rbac.middleware({
+    getUserRoles: (req) => req.user.roles,
+    resource: 'Bookings',
+    permission: (req) => {
+      // Map HTTP method to permission
+      switch (req.method) {
+        case 'GET': return 'READ';
+        case 'POST': return 'CREATE';
+        case 'PUT': case 'PATCH': return 'UPDATE';
+        case 'DELETE': return 'DELETE';
+        default: return 'READ';
+      }
+    },
+    onDenied: (req, res) => {
+      res.status(403).json({ 
+        error: 'Access denied',
+        message: `You don't have permission to ${req.method} bookings` 
+      });
+    }
+  }),
+  (req, res) => {
+    // Handle the request
+  }
+);
 ```
 
-## Working with Role Hierarchies
+## Understanding Role Hierarchy (Role Inheritance)
+
+The role hierarchy feature allows roles to inherit permissions from other roles. This is one of the most powerful but sometimes confusing aspects of the library.
 
 ```typescript
 // Define role hierarchy
@@ -114,14 +140,50 @@ rbac.setRoleHierarchy({
   'EDITOR': ['ADMIN'],  // EDITOR inherits all permissions from ADMIN
   'VIEWER': ['EDITOR']  // VIEWER inherits all permissions from EDITOR
 });
-
-// Now EDITOR inherits all permissions from ADMIN,
-// and VIEWER inherits permissions from both EDITOR and ADMIN (transitively)
 ```
 
-**Important Note on Role Hierarchy**: When setting up hierarchy, specify which role inherits from which. In the example above, `'EDITOR': ['ADMIN']` means that EDITOR inherits permissions from ADMIN, not that ADMIN inherits from EDITOR. This is effectively a parent-child relationship where the child is the key and the parents are in the array.
+**Important Clarification on Role Hierarchy**: 
+
+In the role hierarchy configuration:
+- The `key` is the **child role** (the one inheriting permissions)
+- The `array values` are the **parent roles** (the ones being inherited from)
+
+This means:
+- `'EDITOR': ['ADMIN']` means that EDITOR inherits permissions from ADMIN, not the other way around
+- `'VIEWER': ['EDITOR']` means VIEWER inherits from EDITOR (and transitively from ADMIN too)
+
+Think of it like this:
+```
+'CHILD_ROLE': ['PARENT_ROLE_1', 'PARENT_ROLE_2']
+```
+
+Let's look at a more complete example to illustrate how role hierarchy works:
+
+```typescript
+// Define role hierarchy with more complex relationships
+rbac.setRoleHierarchy({
+  // Store roles inherit from more general roles
+  'STORE_MANAGER': ['ADMIN'],      // Store Manager inherits from Admin
+  'STORE_CLERK': ['STORE_MANAGER'], // Store Clerk inherits from Store Manager
+  
+  // Content roles also inherit
+  'CONTENT_EDITOR': ['ADMIN'],     // Content Editor inherits from Admin
+  'CONTENT_VIEWER': ['CONTENT_EDITOR'], // Content Viewer inherits from Content Editor
+  
+  // Special case: dual inheritance
+  'SUPERVISOR': ['STORE_MANAGER', 'CONTENT_EDITOR'] // Inherits from both roles
+});
+
+// Let's test some permissions
+console.log(rbac.can('STORE_CLERK', 'Products', 'READ')); // true if STORE_MANAGER has this permission
+console.log(rbac.can('SUPERVISOR', 'Content', 'PUBLISH')); // true if either parent role has this permission
+```
+
+The library automatically handles transitive inheritance and detects circular references to prevent infinite loops.
 
 ## Dynamic Permission Updates
+
+You can modify permissions at runtime without restarting your application:
 
 ```typescript
 // Add a new role
@@ -138,95 +200,67 @@ rbac.grant('EDITOR', 'Reports', ['READ']);
 
 // Revoke permissions
 rbac.revoke('EDITOR', 'Bookings', ['DELETE']);
+
+// Revoke all permissions on a resource
+rbac.revoke('EDITOR', 'Bookings');
+
+// Remove a role entirely
+rbac.removeRole('GUEST');
+
+// Update the entire configuration
+rbac.updateConfig(newConfig);
+```
+
+Remember to clear the cache after making permission changes (the built-in methods like `grant()` and `revoke()` handle this automatically):
+
+```typescript
+// Manually clear the cache when needed
+rbac.clearCache();
+```
+
+## Policy Evaluation
+
+You can evaluate policies directly:
+
+```typescript
+const policyResult = rbac.evaluatePolicy({
+  role: 'EDITOR',
+  resource: 'Products',
+  permission: 'UPDATE'
+});
+
+console.log(policyResult.allowed); // boolean
+console.log(policyResult.reason);  // explanation string
+```
+
+## Query Available Permissions and Resources
+
+```typescript
+// Get all permissions a role has on a resource
+const permissions = rbac.getPermissions('EDITOR', 'Products');
+// Returns: ['CREATE', 'READ', 'UPDATE', 'DELETE']
+
+// Get all resources a role has access to
+const resources = rbac.getResources('ADMIN');
+// Returns: ['Products', 'News', 'Bookings', ...]
+
+// Get all roles in the system
+const roles = rbac.getRoles();
+// Returns: ['ADMIN', 'EDITOR', 'VIEWER', ...]
+
+// Get cache statistics
+const cacheStats = rbac.getCacheStats();
+// Returns: { enabled: true, size: 42 }
 ```
 
 ## Best Practices
 
-1. **Use Non-strict Mode in Production**: Set `strict: false` in production to prevent throwing errors for undefined roles or resources, which could cause service disruptions.
+### 1. Use Constants for Roles, Resources and Permissions
 
-2. **Enable Caching**: Always use caching in production for better performance, but be aware of the memory usage implications.
-
-3. **Clear Cache After Updates**: Always call `clearCache()` after making permission changes, or simply use the built-in methods like `grant()` and `revoke()` which handle this automatically.
-
-4. **Properly Set Up Role Hierarchy**: Remember that in the hierarchy object, the key is the child role and the array values are parent roles (e.g., `{'EDITOR': ['ADMIN']}` means EDITOR inherits from ADMIN).
-
-5. **Use Custom Logger**: Configure a custom logger to integrate with your application's logging system.
-
-6. **Isolate Permission Checks**: For high-security areas, consider using isolated permission checks rather than role-based checks for more granular control.
-
-7. **Regular Permission Audits**: Implement a system to audit and review permissions regularly, especially for sensitive resources.
-
-8. **Implement Resource Ownership**: For multi-tenant systems, combine RBAC with resource ownership checks for additional security.
-
-## Security Features
-
-This package includes security-focused features to protect your application's permission system:
-
-1. **Input Validation**: All role, resource, and permission inputs are validated to prevent injection attacks and manipulation.
-
-2. **Circular Reference Detection**: Automatic detection and prevention of circular references in role hierarchies.
-
-3. **Default Deny**: The system always defaults to denying access when errors occur or when roles/permissions are undefined.
-
-4. **Deep Cloning**: All configuration objects are deep-cloned to prevent external mutation attacks.
-
-5. **Protected Cache Keys**: The caching system uses sanitized keys and secret salts to prevent cache poisoning.
-
-6. **Secure Middleware**: The Express middleware is designed to securely handle errors and always default to access denial.
-
-7. **Audit Logging**: Built-in audit logging for critical permission changes and access attempts.
-
-8. **Type Safety**: TypeScript types enforce proper structure and prevent common mistakes.
-
-9. **Race Condition Protection**: Special handling to prevent race conditions during permission updates.
-
-10. **Secure Error Handling**: Error messages are designed to avoid leaking sensitive information.
-
-### Recommended Security Configuration
+Define constants to prevent typos and ensure consistency:
 
 ```typescript
-// Create a secure RBAC manager
-const rbac = new RBACManager(config, {
-  cache: {
-    enabled: true,
-    maxSize: 1000,
-    ttl: 30 * 60 * 1000  // 30 minute TTL
-  },
-  strict: true,  // In development: fails fast on errors
-  logger: {
-    debug: (msg, ...args) => console.debug(`[RBAC] ${msg}`, ...args),
-    info: (msg, ...args) => console.info(`[RBAC] ${msg}`, ...args),
-    warn: (msg, ...args) => console.warn(`[RBAC] ${msg}`, ...args),
-    error: (msg, ...args) => console.error(`[RBAC] ${msg}`, ...args)
-  }
-});
-
-// Use secure middleware with audit logging
-app.get(
-  '/api/sensitive-data',
-  rbac.middleware({
-    getUserRoles: (req) => req.user.roles,
-    resource: 'SensitiveData',
-    permission: 'READ',
-    auditLog: true,  // Enable audit logging for sensitive operations
-    onDenied: (req, res) => {
-      // Log the denial but don't expose details
-      console.warn(`Access denied for user ${req.user.id}`);
-      res.status(403).json({ error: 'Access denied' });
-    }
-  }),
-  (req, res) => {
-    // Handle the request
-  }
-);
-```
-
-### Security Hardening Recommendations
-
-1. **Use Predefined Constants**: Instead of using arbitrary strings for roles, resources, and permissions, define constants:
-
-```typescript
-// Define constants for roles, resources, and permissions
+// Define constants
 const ROLES = {
   ADMIN: 'ADMIN',
   EDITOR: 'EDITOR',
@@ -250,16 +284,120 @@ const PERMISSIONS = {
 rbac.grant(ROLES.EDITOR, RESOURCES.PRODUCTS, [PERMISSIONS.READ, PERMISSIONS.UPDATE]);
 ```
 
-2. **Regular Security Audits**: Implement periodic reviews of your role hierarchies and permission assignments.
+### 2. Non-strict Mode in Production
 
-3. **Principle of Least Privilege**: Assign the minimum permissions necessary for each role.
+Set `strict: false` in production to prevent throwing errors for undefined roles or resources. This prevents service disruptions if a role is referenced that doesn't exist.
 
-4. **Permission Approval Workflow**: For sensitive permissions, implement a multi-step approval process.
+```typescript
+const rbac = new RBACManager(config, {
+  strict: process.env.NODE_ENV === 'development'
+});
+```
 
-5. **Limit Admin Roles**: Restrict the number of users with administrative privileges.
+### 3. Enable Caching
 
-6. **Protect Against Privilege Escalation**: Be careful with dynamic role assignment to prevent unauthorized elevation of privileges.
+Always use caching in production for better performance:
 
+```typescript
+const rbac = new RBACManager(config, {
+  cache: {
+    enabled: true,
+    maxSize: 1000, // Limit cache size to prevent memory issues
+    ttl: 5 * 60 * 1000 // Cache TTL of 5 minutes
+  }
+});
+```
+
+### 4. Properly Set Up Role Hierarchy
+
+Remember that in the hierarchy object:
+- The key is the child role (the one inheriting permissions)  
+- The array values are parent roles (the ones being inherited from)
+
+```typescript
+// CORRECT:
+rbac.setRoleHierarchy({
+  'EDITOR': ['ADMIN'], // EDITOR inherits from ADMIN
+});
+
+// INCORRECT (would mean ADMIN inherits from EDITOR):
+rbac.setRoleHierarchy({
+  'ADMIN': ['EDITOR']
+});
+```
+
+### 5. Use Custom Logger
+
+Configure a custom logger to integrate with your application's logging system:
+
+```typescript
+const rbac = new RBACManager(config, {
+  logger: {
+    debug: (msg) => myLogger.debug(`[RBAC] ${msg}`),
+    info: (msg) => myLogger.info(`[RBAC] ${msg}`),
+    warn: (msg) => myLogger.warn(`[RBAC] ${msg}`),
+    error: (msg) => myLogger.error(`[RBAC] ${msg}`)
+  }
+});
+```
+
+### 6. Implement Resource Ownership
+
+For multi-tenant systems, combine RBAC with resource ownership checks:
+
+```typescript
+// Middleware to check both permissions and ownership
+const checkPermissionAndOwnership = (req, res, next) => {
+  const resourceId = req.params.id;
+  const userId = req.user.id;
+  
+  // First check RBAC permissions
+  if (!rbac.userCan(req.user, 'Orders', 'UPDATE')) {
+    return res.status(403).json({ error: 'Permission denied' });
+  }
+  
+  // Then check ownership
+  orderService.getOrderById(resourceId)
+    .then(order => {
+      if (order.userId !== userId) {
+        return res.status(403).json({ error: 'Not your order' });
+      }
+      next();
+    });
+};
+```
+
+## Security Features
+
+This package includes security-focused features to protect your application's permission system:
+
+1. **Input Validation**: All role, resource, and permission inputs are validated to prevent injection attacks and manipulation.
+
+2. **Circular Reference Detection**: Automatic detection and prevention of circular references in role hierarchies.
+
+3. **Default Deny**: The system always defaults to denying access when errors occur or when roles/permissions are undefined.
+
+4. **Deep Cloning**: All configuration objects are deep-cloned to prevent external mutation attacks.
+
+5. **Protected Cache Keys**: The caching system uses sanitized keys to prevent cache poisoning.
+
+6. **Secure Middleware**: The Express middleware is designed to securely handle errors and always default to access denial.
+
+7. **Audit Logging**: Built-in audit logging for critical permission changes and access attempts.
+
+8. **Type Safety**: TypeScript types enforce proper structure and prevent common mistakes.
+
+9. **Race Condition Protection**: Special handling to prevent race conditions during permission updates.
+
+10. **Secure Error Handling**: Error messages are designed to avoid leaking sensitive information.
+
+## Advanced Examples
+
+For more advanced usage examples, check the `examples` directory in the repository:
+
+- `product-shop.ts`: Basic e-commerce example with standard roles
+- `express-integration.ts`: Example integration with Express.js middleware
+- `advanced-example.ts`: Complex role hierarchy with comprehensive permissions
 
 ## API Reference
 
@@ -345,4 +483,3 @@ const config = builder.build();
 ## License
 
 MIT
-# rbac

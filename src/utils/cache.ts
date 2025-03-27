@@ -25,28 +25,28 @@ export class PermissionCache {
   private createKey(role: string, resource: string, permission: string): string {
     // Validate inputs to prevent key injection
     if (!role || !resource || !permission) {
-      throw new Error('Invalid cache key parameters');
+      throw new Error("Invalid cache key parameters");
     }
-    
+
     // Ensure roles, resources, and permissions are properly sanitized
     const sanitizedRole = this.sanitizeInput(role);
     const sanitizedResource = this.sanitizeInput(resource);
     const sanitizedPermission = this.sanitizeInput(permission);
-    
+
     // Create a key with the secure salt to prevent key collision attacks
     return `${this.secureSalt}:${sanitizedRole}:${sanitizedResource}:${sanitizedPermission}`;
   }
-  
+
   /**
    * Sanitizes input to prevent cache key injection attacks
    * @private
    */
   private sanitizeInput(input: string): string {
-    if (typeof input !== 'string') {
-      return String(input); 
+    if (typeof input !== "string") {
+      return String(input);
     }
     // Remove any colons or other characters that could affect key structure
-    return input.replace(/[:\n\r]/g, '_');
+    return input.replace(/[:\n\r]/g, "_");
   }
 
   /**
@@ -67,7 +67,7 @@ export class PermissionCache {
         this.cache.delete(key);
         return undefined;
       }
-      
+
       // Check if entry is from an old version
       if (entry.version < this.version) {
         this.cache.delete(key);
@@ -81,7 +81,7 @@ export class PermissionCache {
       return entry.value;
     } catch (error) {
       // On any error, return undefined to force recalculation
-      console.error('Cache retrieval error:', error);
+      console.error("Cache retrieval error:", error);
       return undefined;
     }
   }
@@ -104,11 +104,11 @@ export class PermissionCache {
       this.cache.set(key, {
         value,
         expiresAt: Date.now() + this.ttl,
-        version: this.version
+        version: this.version,
       });
     } catch (error) {
       // On any error, log but don't throw
-      console.error('Cache set error:', error);
+      console.error("Cache set error:", error);
     }
   }
 
@@ -126,11 +126,11 @@ export class PermissionCache {
    */
   invalidateRole(role: string): void {
     if (!role) return;
-    
+
     try {
       const sanitizedRole = this.sanitizeInput(role);
       const rolePrefix = `${this.secureSalt}:${sanitizedRole}:`;
-      
+
       for (const key of this.cache.keys()) {
         if (key.startsWith(rolePrefix)) {
           this.cache.delete(key);
@@ -138,7 +138,7 @@ export class PermissionCache {
       }
     } catch (error) {
       // On any error, clear entire cache to be safe
-      console.error('Error invalidating role cache:', error);
+      console.error("Error invalidating role cache:", error);
       this.clear();
     }
   }
@@ -148,12 +148,12 @@ export class PermissionCache {
    */
   invalidateResource(resource: string): void {
     if (!resource) return;
-    
+
     try {
       const sanitizedResource = this.sanitizeInput(resource);
-      
+
       for (const key of this.cache.keys()) {
-        const parts = key.split(':');
+        const parts = key.split(":");
         // Parts[2] is the resource part after salt and role
         if (parts.length > 2 && parts[2] === sanitizedResource) {
           this.cache.delete(key);
@@ -161,7 +161,7 @@ export class PermissionCache {
       }
     } catch (error) {
       // On any error, clear entire cache to be safe
-      console.error('Error invalidating resource cache:', error);
+      console.error("Error invalidating resource cache:", error);
       this.clear();
     }
   }
@@ -172,7 +172,7 @@ export class PermissionCache {
   size(): number {
     return this.cache.size;
   }
-  
+
   /**
    * Force cache version increment to invalidate all existing entries on next access
    */
